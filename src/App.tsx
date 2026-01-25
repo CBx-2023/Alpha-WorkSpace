@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
@@ -16,7 +16,8 @@ interface AppCard {
   icon: string;
   type: "url" | "local";
   action: string;
-  position: { x: number; y: number };
+  position: { x: number; y: number }; // 绝对像素坐标
+  inBucket: boolean; // 是否在桶中
 }
 
 interface ToastMessage {
@@ -38,7 +39,8 @@ function App() {
       icon: drawioPng,
       type: "url",
       action: "https://app.diagrams.net/",
-      position: { x: 0, y: 0 },
+      position: { x: 300, y: 200 },
+      inBucket: false,
     },
     {
       id: "typora",
@@ -46,7 +48,8 @@ function App() {
       icon: typoraPng,
       type: "local",
       action: "launch_typora",
-      position: { x: 1, y: 0 },
+      position: { x: 500, y: 200 },
+      inBucket: false,
     },
     {
       id: "gemini",
@@ -54,7 +57,8 @@ function App() {
       icon: geminiPng,
       type: "url",
       action: "https://gemini.google.com/",
-      position: { x: 0, y: 1 },
+      position: { x: 400, y: 350 },
+      inBucket: false,
     },
   ]);
 
@@ -146,11 +150,19 @@ function App() {
     }
   };
 
+  // 鼠标拖拽状态 - 使用 ref 提高性能
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+  const dragElementRef = useRef<HTMLDivElement | null>(null);
+  const hasMovedRef = useRef(false); // 跟踪是否实际移动了
+
   // 处理卡片点击
   const handleCardClick = (e: React.MouseEvent, card: AppCard) => {
-    // 如果正在拖拽，不触发点击
-    if (draggedCard) {
+    // 如果刚刚拖拽过，不触发点击
+    if (hasMovedRef.current) {
       e.preventDefault();
+      e.stopPropagation();
+      hasMovedRef.current = false;
       return;
     }
 
@@ -161,92 +173,123 @@ function App() {
     }
   };
 
-  // 拖拽开始
-  const handleDragStart = (e: React.DragEvent, cardId: string) => {
+  // 鼠标按下 - 开始拖拽
+  const handleMouseDown = (e: React.MouseEvent, cardId: string) => {
+    const card = cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    e.preventDefault();
     setDraggedCard(cardId);
-    e.dataTransfer.effectAllowed = "move";
+    setIsDragging(true);
+    hasMovedRef.current = false; // 重置移动标志
+
+    // 保存拖拽元素引用
+    dragElementRef.current = e.currentTarget as HTMLDivElement;
+
+    // 记录起始位置
+    dragStartPosRef.current = {
+      x: e.clientX - card.position.x,
+      y: e.clientY - card.position.y,
+    };
   };
 
-  // 拖拽结束
-  const handleDragEnd = () => {
-    setDraggedCard(null);
+  // 鼠标移动 - 直接操作DOM，避免状态更新
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !draggedCard || !dragElementRef.current) return;
+
+    const newX = e.clientX - dragStartPosRef.current.x;
+    const newY = e.clientY - dragStartPosRef.current.y;
+
+    // 标记已经移动
+    hasMovedRef.current = true;
+
+    // 直接更新DOM位置，不触发React重渲染
+    dragElementRef.current.style.left = `${newX}px`;
+    dragElementRef.current.style.top = `${newY}px`;
   };
 
-  // 拖拽经过
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
+  // 鼠标松开 - 更新状态并保存
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging || !draggedCard) return;
 
-  // 放置
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+    const newX = e.clientX - dragStartPosRef.current.x;
+    const newY = e.clientY - dragStartPosRef.current.y;
 
-    if (!draggedCard || draggedCard === targetId) return;
+    // 检查是否在桶上
+    const bucketElement = document.querySelector('.bucket-icon');
+    let isOverBucket = false;
 
-    const updatedCards = [...cards];
-    const draggedIndex = updatedCards.findIndex((c) => c.id === draggedCard);
-    const targetIndex = updatedCards.findIndex((c) => c.id === targetId);
+    if (bucketElement) {
+      const bucketRect = bucketElement.getBoundingClientRect();
+      isOverBucket =
+        e.clientX >= bucketRect.left &&
+        e.clientX <= bucketRect.right &&
+        e.clientY >= bucketRect.top &&
+        e.clientY <= bucketRect.bottom;
+    }
 
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // 交换位置
-    const draggedPos = { ...updatedCards[draggedIndex].position };
-    updatedCards[draggedIndex].position = { ...updatedCards[targetIndex].position };
-    updatedCards[targetIndex].position = draggedPos;
+    // 更新状态
+    const updatedCards = cards.map((card) => {
+      if (card.id === draggedCard) {
+        return {
+          ...card,
+          position: { x: newX, y: newY },
+          inBucket: isOverBucket || card.inBucket,
+        };
+      }
+      return card;
+    });
 
     setCards(updatedCards);
     saveLayout(updatedCards);
+
+    if (isOverBucket) {
+      showToast("图标已添加到桶中", "success");
+    }
+
+    // 重置拖拽状态
+    if (dragElementRef.current) {
+      dragElementRef.current.style.transform = '';
+    }
+    dragElementRef.current = null;
     setDraggedCard(null);
+    setIsDragging(false);
   };
 
-  // 根据位置排序卡片
-  const getSortedCards = () => {
-    return [...cards].sort((a, b) => {
-      if (a.position.y !== b.position.y) {
-        return a.position.y - b.position.y;
-      }
-      return a.position.x - b.position.x;
-    });
-  };
+  // 渲染函数助手
+  const getVisibleCards = () => cards.filter((card) => !card.inBucket);
+  const getBucketCards = () => cards.filter((card) => card.inBucket);
 
   return (
-    <div className="app">
-      {/* 顶部标签 */}
-      <div className="top-badge">Alpha内测版</div>
+    <div
+      className="app"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+    >
+      {/* 顶部标签 - 隐藏 */}
 
-      {/* 主容器 */}
+      {/* 主容器 - 可见的图标 */}
       <div className="main-container">
-        {getSortedCards().map((card, index) => {
-          // 计算轨道位置（圆形排列）
-          const angle = (index / cards.length) * 2 * Math.PI - Math.PI / 2;
-          const radius = 200;
-          const x = Math.cos(angle) * radius;
-          const y = Math.sin(angle) * radius;
-
-          return (
-            <div
-              key={card.id}
-              className={`function-card ${draggedCard === card.id ? "dragging" : ""}`}
-              onClick={(e) => handleCardClick(e, card)}
-              draggable
-              onDragStart={(e) => handleDragStart(e, card.id)}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, card.id)}
-              style={{
-                transform: `translate(${x}px, ${y}px)`,
-                opacity: draggedCard === card.id ? 0.7 : 1,
-              }}
-            >
-              <div className="card-icon">
-                <img src={card.icon} alt={card.name} />
-              </div>
-              <div className="card-label">{card.name}</div>
+        {getVisibleCards().map((card) => (
+          <div
+            key={card.id}
+            className={`function-card ${draggedCard === card.id ? "dragging" : ""}`}
+            onClick={(e) => handleCardClick(e, card)}
+            onMouseDown={(e) => handleMouseDown(e, card.id)}
+            style={{
+              position: "absolute",
+              left: `${card.position.x}px`,
+              top: `${card.position.y}px`,
+              opacity: draggedCard === card.id ? 0.7 : 1,
+              cursor: isDragging ? "grabbing" : "grab",
+            }}
+          >
+            <div className="card-icon">
+              <img src={card.icon} alt={card.name} />
             </div>
-          );
-        })}
+            <div className="card-label">{card.name}</div>
+          </div>
+        ))}
       </div>
 
       {/* Google Bucket */}
@@ -260,6 +303,7 @@ function App() {
 
         {showBucketMenu && (
           <div className="bucket-menu">
+            {/* 固定的桶项目 */}
             <div
               className="bucket-item"
               onClick={() => openUrl("https://aistudio.google.com/")}
@@ -278,6 +322,35 @@ function App() {
               </span>
               <span>NotebookLM</span>
             </div>
+
+            {/* 用户添加的图标 */}
+            {getBucketCards().length > 0 && (
+              <>
+                <div style={{
+                  borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+                  margin: "8px 0"
+                }} />
+                {getBucketCards().map((card) => (
+                  <div
+                    key={card.id}
+                    className="bucket-item"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      handleMouseDown(e, card.id);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCardClick(e, card);
+                    }}
+                  >
+                    <span className="bucket-item-icon">
+                      <img src={card.icon} alt={card.name} />
+                    </span>
+                    <span>{card.name}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
