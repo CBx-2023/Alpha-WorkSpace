@@ -218,29 +218,35 @@ function App() {
 
       {/* 主容器 */}
       <div className="main-container">
-        {getSortedCards().map((card) => (
-          <div
-            key={card.id}
-            className={`function-card ${card.id === "gemini" ? "center" : "square"}`}
-            onClick={(e) => handleCardClick(e, card)}
-            draggable
-            onDragStart={(e) => handleDragStart(e, card.id)}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, card.id)}
-            style={{
-              gridColumn: card.position.x + 1,
-              gridRow: card.position.y + 1,
-              cursor: draggedCard ? "grabbing" : "grab",
-              opacity: draggedCard === card.id ? 0.5 : 1,
-            }}
-          >
-            <div className="card-icon">
-              <img src={card.icon} alt={card.name} />
+        {getSortedCards().map((card, index) => {
+          // 计算轨道位置（圆形排列）
+          const angle = (index / cards.length) * 2 * Math.PI - Math.PI / 2;
+          const radius = 200;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+
+          return (
+            <div
+              key={card.id}
+              className={`function-card ${draggedCard === card.id ? "dragging" : ""}`}
+              onClick={(e) => handleCardClick(e, card)}
+              draggable
+              onDragStart={(e) => handleDragStart(e, card.id)}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, card.id)}
+              style={{
+                transform: `translate(${x}px, ${y}px)`,
+                opacity: draggedCard === card.id ? 0.7 : 1,
+              }}
+            >
+              <div className="card-icon">
+                <img src={card.icon} alt={card.name} />
+              </div>
+              <div className="card-label">{card.name}</div>
             </div>
-            <div className="card-label">{card.name}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Google Bucket */}
