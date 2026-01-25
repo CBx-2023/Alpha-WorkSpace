@@ -19,11 +19,18 @@ interface AppCard {
   position: { x: number; y: number };
 }
 
+interface ToastMessage {
+  id: number;
+  message: string;
+  type: "success" | "error" | "info";
+}
+
 function App() {
   const [showBucketMenu, setShowBucketMenu] = useState(false);
   const [showTyporaDialog, setShowTyporaDialog] = useState(false);
   const [typoraPath, setTyporaPath] = useState("");
   const [draggedCard, setDraggedCard] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [cards, setCards] = useState<AppCard[]>([
     {
       id: "drawio",
@@ -82,6 +89,15 @@ function App() {
     }
   }, []);
 
+  // 显示 Toast 通知
+  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 3000);
+  };
+
   // 保存卡片位置
   const saveLayout = (updatedCards: AppCard[]) => {
     localStorage.setItem("alpha-workspace-layout", JSON.stringify(updatedCards));
@@ -92,7 +108,7 @@ function App() {
     try {
       await invoke("open_url", { url });
     } catch (error) {
-      alert(`打开失败: ${error} `);
+      showToast(`打开失败: ${error}`, "error");
     }
   };
 
@@ -108,22 +124,25 @@ function App() {
   // 保存 Typora 路径
   const saveTyporaPath = async () => {
     if (!typoraPath.trim()) {
-      alert("请输入有效的路径");
+      showToast("请输入有效的路径", "error");
       return;
     }
 
+    // 规范化路径：移除首尾引号
+    const normalizedPath = typoraPath.trim().replace(/^"|"$/g, '');
+
     try {
-      await invoke("set_typora_path", { path: typoraPath });
+      await invoke("set_typora_path", { path: normalizedPath });
       setShowTyporaDialog(false);
-      alert("Typora 路径已保存！");
+      showToast("Typora 路径已保存！", "success");
 
       try {
         await invoke("launch_typora");
       } catch (launchError) {
-        alert(`启动失败: ${launchError} \n请检查路径是否正确。`);
+        showToast(`启动失败: ${launchError}。请检查路径是否正确。`, "error");
       }
     } catch (error) {
-      alert(`保存失败: ${error} `);
+      showToast(`保存失败: ${error}`, "error");
     }
   };
 
@@ -284,6 +303,15 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Toast 通知 */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
