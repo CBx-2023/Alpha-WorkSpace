@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::path::Path;
 use tauri::Manager;
 
 // 打开 URL 的命令
@@ -29,6 +30,44 @@ fn open_url(url: String) -> Result<(), String> {
     }
     
     Ok(())
+}
+
+// 自动检测 Typora 安装路径
+#[tauri::command]
+fn auto_detect_typora_path() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        // 常见的 Typora 安装路径
+        let possible_paths = vec![
+            r"C:\Program Files\Typora\Typora.exe".to_string(),
+            r"C:\Program Files (x86)\Typora\Typora.exe".to_string(),
+            format!(r"{}\AppData\Local\Programs\Typora\Typora.exe", 
+                std::env::var("USERPROFILE").unwrap_or_default()),
+            format!(r"{}\Typora\Typora.exe", 
+                std::env::var("LOCALAPPDATA").unwrap_or_default()),
+        ];
+        
+        for path in possible_paths {
+            if Path::new(&path).exists() {
+                return Some(path);
+            }
+        }
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        let possible_paths = vec![
+            "/Applications/Typora.app/Contents/MacOS/Typora".to_string(),
+        ];
+        
+        for path in possible_paths {
+            if Path::new(&path).exists() {
+                return Some(path);
+            }
+        }
+    }
+    
+    None
 }
 
 // 启动 Typora 的命令
@@ -77,6 +116,7 @@ pub fn run() {
         .manage(std::sync::Mutex::new(None::<String>))
         .invoke_handler(tauri::generate_handler![
             open_url,
+            auto_detect_typora_path,
             launch_typora,
             get_typora_path,
             set_typora_path

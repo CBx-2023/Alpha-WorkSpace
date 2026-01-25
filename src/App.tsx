@@ -69,6 +69,16 @@ function App() {
         const savedPath = await invoke<string | null>("get_typora_path");
         if (savedPath) {
           setTyporaPath(savedPath);
+          return; // 已有路径，无需自动检测
+        }
+
+        // 如果没有保存的路径，尝试自动检测
+        const detectedPath = await invoke<string | null>("auto_detect_typora_path");
+        if (detectedPath) {
+          await invoke("set_typora_path", { path: detectedPath });
+          setTyporaPath(detectedPath);
+          showToast("Typora 路径已自动配置", "success");
+          console.log("Typora 路径已自动配置:", detectedPath);
         }
       } catch (error) {
         console.error("Failed to load Typora path:", error);
