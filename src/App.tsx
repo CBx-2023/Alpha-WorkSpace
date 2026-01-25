@@ -468,6 +468,200 @@ function App() {
         )}
       </div>
 
+      {/* 简易帮助对话框 */}
+      {showHelp && !showFullManual && (
+        <div className="dialog-overlay" onClick={() => setShowHelp(false)}>
+          <div className="dialog help-dialog" onClick={e => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h2>Alpha Workspace 使用手册</h2>
+              <button className="close-btn" onClick={() => setShowHelp(false)}>×</button>
+            </div>
+            <div className="help-content">
+              <h3>🌟 核心功能</h3>
+              <ul>
+                <li><strong>自由拖拽</strong>：按住图标即可移动，松开即保存位置。</li>
+                <li><strong>收纳桶</strong>：将不常用的图标拖到右下角桶中，保持桌面整洁。</li>
+                <li><strong>Typora集成</strong>：一键打开 Typora 编辑器，支持自动路径配置。</li>
+              </ul>
+
+              <h3>🎮 操作指南</h3>
+              <ul>
+                <li><strong>左键点击</strong>：打开应用</li>
+                <li><strong>按住拖动</strong>：移动图标</li>
+                <li><strong>从桶中取出</strong>：打开桶菜单，拖拽图标回桌面</li>
+              </ul>
+
+              <div className="help-footer">
+                <p>当前版本：Alpha内测版</p>
+                <button
+                  className="btn-primary"
+                  onClick={() => setShowFullManual(true)}
+                >
+                  查看完整文档
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 完整使用手册对话框 */}
+      {showFullManual && (
+        <div className="dialog-overlay" onClick={() => setShowFullManual(false)}>
+          <div className="dialog full-manual-dialog" onClick={e => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h2>Alpha Workspace 使用手册</h2>
+              <div className="header-actions">
+                <button
+                  className="btn-secondary btn-sm"
+                  onClick={() => setShowFullManual(false)}
+                >
+                  返回摘要
+                </button>
+                <button className="close-btn" onClick={() => {
+                  setShowFullManual(false);
+                  setShowHelp(false);
+                }}>×</button>
+              </div>
+            </div>
+            <div className="manual-content scrollable">
+              <div className="manual-section">
+                <p className="manual-intro">欢迎使用 Alpha Workspace！这是一个极简、高效的桌面工作区管理工具。</p>
+
+                <h3>🌟 核心功能</h3>
+
+                <div className="feature-block">
+                  <h4>1. 自由布局系统</h4>
+                  <ul>
+                    <li><strong>拖拽排布</strong>：您可以按住任意图标，将其拖拽到屏幕的任何位置。</li>
+                    <li><strong>自动保存</strong>：所有的图标位置变动都会自动保存，下次打开即恢复原样。</li>
+                    <li><strong>防止误触</strong>：拖拽后和点击有智能区分，防止操作冲突。</li>
+                  </ul>
+                </div>
+
+                <div className="feature-block">
+                  <h4>2. 收纳桶 (Google Bucket)</h4>
+                  <ul>
+                    <li><strong>收纳图标</strong>：将不常用的图标拖拽到右下角的"桶(Bucket)"图标上，即可将其收纳。</li>
+                    <li><strong>取出图标</strong>：点击桶图标打开菜单，将里面的图标拖拽回桌面即可取出。</li>
+                    <li><strong>内置应用</strong>：桶内默认集成了 AI Studio 和 NotebookLM 快捷入口。</li>
+                  </ul>
+                </div>
+
+                <div className="feature-block">
+                  <h4>3. Typora 深度集成</h4>
+                  <ul>
+                    <li><strong>一键启动</strong>：点击 Typora 图标即可快速启动本地 Typora 编辑器。</li>
+                    <li><strong>自动配置</strong>：首次运行会自动检测 Typora 安装路径。</li>
+                  </ul>
+                </div>
+
+                <div className="feature-block">
+                  <h4>4. 快捷访问</h4>
+                  <ul>
+                    <li><strong>Draw.io</strong>：集成在线绘图工具。</li>
+                    <li><strong>Gemini</strong>：快速访问 Google Gemini AI。</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="manual-section">
+                <h3>🎮 操作指南</h3>
+                <table className="manual-table">
+                  <thead>
+                    <tr>
+                      <th>动作</th>
+                      <th>说明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>左键单击</strong></td>
+                      <td>打开应用或链接</td>
+                    </tr>
+                    <tr>
+                      <td><strong>按住拖动</strong></td>
+                      <td>移动图标位置</td>
+                    </tr>
+                    <tr>
+                      <td><strong>拖入桶中</strong></td>
+                      <td>收纳图标</td>
+                    </tr>
+                    <tr>
+                      <td><strong>点击桶</strong></td>
+                      <td>展开/收起收纳菜单</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="manual-footer">
+                <p>Alpha Workspace 内测版 - 2026</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 添加应用对话框 */}
+      {showAddDialog && (
+        <div className="dialog-overlay">
+          <div className="dialog add-app-dialog">
+            <h2>添加自定义应用</h2>
+            <div className="form-group">
+              <label>应用名称</label>
+              <input
+                type="text"
+                placeholder="例如：我的网站"
+                value={newAppForm.name}
+                onChange={e => setNewAppForm({ ...newAppForm, name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>目标地址 (URL 或 本地路径)</label>
+              <input
+                type="text"
+                placeholder="https://... 或 C:\Program Files\..."
+                value={newAppForm.target}
+                onChange={e => setNewAppForm({ ...newAppForm, target: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>应用图标</label>
+              <div
+                className="icon-upload-area"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {newAppForm.icon ? (
+                  <img src={newAppForm.icon} alt="Preview" className="icon-preview" />
+                ) : (
+                  <div className="upload-placeholder">
+                    <span>点击上传图标</span>
+                    <small>支持 PNG, JPG</small>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  hidden
+                  accept="image/png, image/jpeg"
+                  onChange={handleIconUpload}
+                />
+              </div>
+            </div>
+            <div className="dialog-buttons">
+              <button onClick={handleAddApp} className="btn-primary">添加</button>
+              <button
+                onClick={() => setShowAddDialog(false)}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 重置确认对话框 */}
       {showResetConfirm && (
         <div className="dialog-overlay" onClick={() => setShowResetConfirm(false)}>
