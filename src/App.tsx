@@ -42,6 +42,8 @@ function App() {
     target: "",
     icon: ""
   });
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [cards, setCards] = useState<AppCard[]>([
@@ -323,10 +325,13 @@ function App() {
     showToast("应用添加成功！", "success");
   };
 
-  // 重置布局
+  // 重置布局 - 打开确认框
   const handleResetLayout = () => {
-    if (!confirm("确定要重置所有图标位置吗？")) return;
+    setShowResetConfirm(true);
+  };
 
+  // 确认重置逻辑
+  const confirmReset = () => {
     const defaultPositions: Record<string, { x: number, y: number }> = {
       "drawio": { x: 300, y: 200 },
       "typora": { x: 500, y: 200 },
@@ -341,6 +346,7 @@ function App() {
 
     setCards(newCards);
     saveLayout(newCards);
+    setShowResetConfirm(false);
     showToast("布局已重置", "success");
   };
 
@@ -461,6 +467,33 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* 重置确认对话框 */}
+      {showResetConfirm && (
+        <div className="dialog-overlay" onClick={() => setShowResetConfirm(false)}>
+          <div className="dialog" style={{ maxWidth: "400px" }} onClick={e => e.stopPropagation()}>
+            <div className="dialog-header">
+              <h2>确认重置</h2>
+              <button className="close-btn" onClick={() => setShowResetConfirm(false)}>×</button>
+            </div>
+            <div style={{ margin: "20px 0", color: "rgba(255,255,255,0.8)", lineHeight: "1.6" }}>
+              <p>您确定要恢复默认布局吗？</p>
+              <p style={{ fontSize: "14px", marginTop: "8px", opacity: 0.7 }}>这将会把所有图标重置回初始位置，自定义应用将被保留在屏幕中央。</p>
+            </div>
+            <div className="dialog-buttons">
+              <button onClick={confirmReset} className="btn-danger">
+                确认重置
+              </button>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Typora 路径配置对话框 */}
       {showTyporaDialog && (

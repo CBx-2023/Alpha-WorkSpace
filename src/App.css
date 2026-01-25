@@ -9,6 +9,25 @@
 }
 
 /* 通用按钮样式 */
+.btn-danger {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(220, 38, 38, 0.8);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-danger:hover {
+  background: rgba(220, 38, 38, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.5);
+}
+
 .add-btn,
 .reset-btn,
 .help-btn {
