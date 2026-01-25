@@ -32,6 +32,18 @@ function App() {
   const [typoraPath, setTyporaPath] = useState("");
   const [draggedCard, setDraggedCard] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // 恢复丢失的状态
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showFullManual, setShowFullManual] = useState(false);
+  const [newAppForm, setNewAppForm] = useState({
+    name: "",
+    target: "",
+    icon: ""
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [cards, setCards] = useState<AppCard[]>([
     {
       id: "drawio",
@@ -94,7 +106,7 @@ function App() {
         setCards((prevCards) =>
           prevCards.map((card) => {
             const saved = parsedLayout.find((c: AppCard) => c.id === card.id);
-            return saved ? { ...card, position: saved.position } : card;
+            return saved ? { ...card, position: saved.position, inBucket: saved.inBucket } : card;
           })
         );
       } catch (error) {
@@ -244,7 +256,7 @@ function App() {
         return {
           ...card,
           position: { x: newX, y: newY },
-          inBucket: isOverBucket || card.inBucket,
+          inBucket: isOverBucket,
         };
       }
       return card;
@@ -270,13 +282,98 @@ function App() {
   const getVisibleCards = () => cards.filter((card) => !card.inBucket);
   const getBucketCards = () => cards.filter((card) => card.inBucket);
 
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        showToast("图标文件过大，请小于2MB", "error");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewAppForm(prev => ({ ...prev, icon: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddApp = () => {
+    if (!newAppForm.name || !newAppForm.target || !newAppForm.icon) {
+      showToast("请填写完整信息", "error");
+      return;
+    }
+
+    const newApp: AppCard = {
+      id: crypto.randomUUID(),
+      name: newAppForm.name,
+      icon: newAppForm.icon,
+      type: newAppForm.target.startsWith("http") ? "url" : "local",
+      action: newAppForm.target,
+      position: { x: window.innerWidth / 2 - 50, y: window.innerHeight / 2 - 50 },
+      inBucket: false
+    };
+
+    const updatedCards = [...cards, newApp];
+    setCards(updatedCards);
+    saveLayout(updatedCards);
+
+    setShowAddDialog(false);
+    setNewAppForm({ name: "", target: "", icon: "" });
+    showToast("应用添加成功！", "success");
+  };
+
+  // 重置布局
+  const handleResetLayout = () => {
+    if (!confirm("确定要重置所有图标位置吗？")) return;
+
+    const defaultPositions: Record<string, { x: number, y: number }> = {
+      "drawio": { x: 300, y: 200 },
+      "typora": { x: 500, y: 200 },
+      "gemini": { x: 400, y: 350 }
+    };
+
+    const newCards = cards.map(card => ({
+      ...card,
+      position: defaultPositions[card.id] || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+      inBucket: false
+    }));
+
+    setCards(newCards);
+    saveLayout(newCards);
+    showToast("布局已重置", "success");
+  };
+
   return (
     <div
       className="app"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
     >
-      {/* 顶部标签 - 隐藏 */}
+      {/* 顶部栏 */}
+      <div className="top-bar">
+        <button
+          className="add-btn"
+          onClick={() => setShowAddDialog(true)}
+          title="添加自定义应用"
+        >
+          <span className="add-icon">+</span>
+        </button>
+        <button
+          className="reset-btn"
+          onClick={handleResetLayout}
+          title="重置默认布局"
+        >
+          <span className="reset-icon">⟳</span>
+        </button>
+        <button
+          className="help-btn"
+          onClick={() => setShowHelp(true)}
+        >
+          <span className="help-icon">?</span>
+          <span>使用帮助</span>
+        </button>
+      </div>
 
       {/* 主容器 - 可见的图标 */}
       <div className="main-container">
