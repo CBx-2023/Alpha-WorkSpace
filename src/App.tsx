@@ -46,6 +46,20 @@ function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    cardId: string | null;
+  }>({ visible: false, x: 0, y: 0, cardId: null });
+
+  // 编辑对话框状态
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingCard, setEditingCard] = useState<AppCard | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", target: "", icon: "" });
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
   const [cards, setCards] = useState<AppCard[]>([
     {
       id: "drawio",
@@ -105,12 +119,32 @@ function App() {
     if (savedLayout) {
       try {
         const parsedLayout = JSON.parse(savedLayout);
-        setCards((prevCards) =>
-          prevCards.map((card) => {
-            const saved = parsedLayout.find((c: AppCard) => c.id === card.id);
-            return saved ? { ...card, position: saved.position, inBucket: saved.inBucket } : card;
-          })
-        );
+
+        setCards((defaultCards) => {
+          // 1. 处理已保存的卡片（合并默认应用的状态，保留自定义应用）
+          const mergedCards = parsedLayout.map((savedCard: AppCard) => {
+            // 检查是否是默认应用
+            const defaultCard = defaultCards.find(d => d.id === savedCard.id);
+            if (defaultCard) {
+              // 如果是默认应用，使用当前代码中的配置(图标/动作)，但覆盖位置和收纳状态
+              // 这样可以避免构建后静态资源路径变化导致图片破损
+              return {
+                ...defaultCard,
+                position: savedCard.position,
+                inBucket: savedCard.inBucket
+              };
+            } else {
+              // 如果是自定义应用，完全使用保存的数据
+              return savedCard;
+            }
+          });
+
+          // 2. 检查是否有新加的默认应用（不在保存记录中）
+          const savedIds = new Set(parsedLayout.map((c: AppCard) => c.id));
+          const newDefaults = defaultCards.filter(d => !savedIds.has(d.id));
+
+          return [...mergedCards, ...newDefaults];
+        });
       } catch (error) {
         console.error("Failed to load layout:", error);
       }
@@ -350,11 +384,119 @@ function App() {
     showToast("布局已重置", "success");
   };
 
+  // 处理右键点击
+  const handleContextMenu = (e: React.MouseEvent, cardId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      cardId
+    });
+  };
+
+  // 关闭右键菜单
+  const closeContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, cardId: null });
+  };
+
+  // 编辑图标
+  const handleEdit = () => {
+    const card = cards.find(c => c.id === contextMenu.cardId);
+    if (card) {
+      setEditingCard(card);
+      setEditForm({
+        name: card.name,
+        target: card.action,
+        icon: card.icon
+      });
+      setShowEditDialog(true);
+    }
+    closeContextMenu();
+  };
+
+  // 保存编辑
+  const handleSaveEdit = () => {
+    if (!editingCard || !editForm.name || !editForm.target || !editForm.icon) {
+      showToast("请填写完整信息", "error");
+      return;
+    }
+
+    const updatedCards = cards.map(card => {
+      if (card.id === editingCard.id) {
+        return {
+          ...card,
+          name: editForm.name,
+          action: editForm.target,
+          icon: editForm.icon,
+          type: editForm.target.startsWith("http") ? "url" as const : "local" as const
+        };
+      }
+      return card;
+    });
+
+    setCards(updatedCards);
+    saveLayout(updatedCards);
+    setShowEditDialog(false);
+    setEditingCard(null);
+    setEditForm({ name: "", target: "", icon: "" });
+    showToast("修改成功！", "success");
+  };
+
+  // 删除图标
+  const handleDelete = () => {
+    const card = cards.find(c => c.id === contextMenu.cardId);
+    if (card) {
+      // 检查是否是默认应用
+      const defaultIds = ["drawio", "typora", "gemini"];
+      if (defaultIds.includes(card.id)) {
+        showToast("默认应用不能删除", "error");
+        closeContextMenu();
+        return;
+      }
+
+      const updatedCards = cards.filter(c => c.id !== contextMenu.cardId);
+      setCards(updatedCards);
+      saveLayout(updatedCards);
+      showToast("已删除", "success");
+    }
+    closeContextMenu();
+  };
+
+  // 查看详情
+  const handleViewDetails = () => {
+    const card = cards.find(c => c.id === contextMenu.cardId);
+    if (card) {
+      const details = `名称: ${card.name}\n类型: ${card.type === "url" ? "网页链接" : "本地应用"}\n目标: ${card.action}`;
+      alert(details);
+    }
+    closeContextMenu();
+  };
+
+  // 编辑图标上传
+  const handleEditIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        showToast("图标文件过大，请小于2MB", "error");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditForm(prev => ({ ...prev, icon: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div
       className="app"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onClick={closeContextMenu}
     >
       {/* 顶部栏 */}
       <div className="top-bar">
@@ -389,6 +531,7 @@ function App() {
             className={`function-card ${draggedCard === card.id ? "dragging" : ""}`}
             onClick={(e) => handleCardClick(e, card)}
             onMouseDown={(e) => handleMouseDown(e, card.id)}
+            onContextMenu={(e) => handleContextMenu(e, card.id)}
             style={{
               position: "absolute",
               left: `${card.position.x}px`,
@@ -708,6 +851,89 @@ function App() {
               </button>
               <button
                 onClick={() => setShowTyporaDialog(false)}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 右键菜单 */}
+      {contextMenu.visible && (
+        <div
+          className="context-menu"
+          style={{
+            position: "fixed",
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            zIndex: 10000
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-item" onClick={handleEdit}>
+            <span>✏️</span> 编辑
+          </div>
+          <div className="context-menu-item" onClick={handleDelete}>
+            <span>🗑️</span> 删除
+          </div>
+          <div className="context-menu-item" onClick={handleViewDetails}>
+            <span>👁️</span> 查看详情
+          </div>
+        </div>
+      )}
+
+      {/* 编辑对话框 */}
+      {showEditDialog && (
+        <div className="dialog-overlay">
+          <div className="dialog add-app-dialog">
+            <h2>编辑应用</h2>
+            <div className="form-group">
+              <label>应用名称</label>
+              <input
+                type="text"
+                placeholder="例如：我的网站"
+                value={editForm.name}
+                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>目标地址 (URL 或 本地路径)</label>
+              <input
+                type="text"
+                placeholder="https://... 或 C:\Program Files\..."
+                value={editForm.target}
+                onChange={e => setEditForm({ ...editForm, target: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>应用图标</label>
+              <div
+                className="icon-upload-area"
+                onClick={() => editFileInputRef.current?.click()}
+              >
+                {editForm.icon ? (
+                  <img src={editForm.icon} alt="Preview" className="icon-preview" />
+                ) : (
+                  <div className="upload-placeholder">
+                    <span>点击上传图标</span>
+                    <small>支持 PNG, JPG</small>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={editFileInputRef}
+                  hidden
+                  accept="image/png, image/jpeg"
+                  onChange={handleEditIconUpload}
+                />
+              </div>
+            </div>
+            <div className="dialog-buttons">
+              <button onClick={handleSaveEdit} className="btn-primary">保存</button>
+              <button
+                onClick={() => setShowEditDialog(false)}
                 className="btn-secondary"
               >
                 取消
