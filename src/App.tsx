@@ -1053,6 +1053,50 @@ function App() {
         </div>
       )}
 
+      {/* 详情对话框 */}
+      {showDetailsDialog && detailsCard && (
+        <div className="dialog-overlay">
+          <div className="dialog details-dialog">
+            <h2>应用详情</h2>
+            <div className="details-content">
+              <div className="detail-item">
+                <div className="detail-icon">
+                  <img src={detailsCard.icon} alt={detailsCard.name} />
+                </div>
+              </div>
+              <div className="detail-item">
+                <label>名称</label>
+                <div className="detail-value">{detailsCard.name}</div>
+              </div>
+              <div className="detail-item">
+                <label>类型</label>
+                <div className="detail-value">
+                  {detailsCard.type === "url" ? "🌐 网页链接" : "💻 本地应用"}
+                </div>
+              </div>
+              <div className="detail-item">
+                <label>目标地址</label>
+                <div className="detail-value detail-target">{detailsCard.action}</div>
+              </div>
+              <div className="detail-item">
+                <label>状态</label>
+                <div className="detail-value">
+                  {detailsCard.inBucket ? "📦 在收纳桶中" : "🖥️ 在桌面上"}
+                </div>
+              </div>
+            </div>
+            <div className="dialog-buttons">
+              <button
+                onClick={() => setShowDetailsDialog(false)}
+                className="btn-primary"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast 通知 */}
       <div className="toast-container">
         {toasts.map((toast) => (
