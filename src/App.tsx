@@ -60,6 +60,10 @@ function App() {
   const [editForm, setEditForm] = useState({ name: "", target: "", icon: "" });
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
+  // 详情对话框状态
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [detailsCard, setDetailsCard] = useState<AppCard | null>(null);
+
   const [cards, setCards] = useState<AppCard[]>([
     {
       id: "drawio",
@@ -163,6 +167,48 @@ function App() {
   // 保存卡片位置
   const saveLayout = (updatedCards: AppCard[]) => {
     localStorage.setItem("alpha-workspace-layout", JSON.stringify(updatedCards));
+  };
+
+  // 判断是否为 URL（支持 IP、域名、带/不带协议）
+  const isUrl = (target: string): boolean => {
+    const trimmed = target.trim();
+
+    // 已经有协议前缀
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return true;
+    }
+
+    // IP 地址格式 (简单判断)
+    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/;
+    if (ipPattern.test(trimmed)) {
+      return true;
+    }
+
+    // 域名格式 (包含点号，不包含反斜杠)
+    const domainPattern = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+/;
+    if (domainPattern.test(trimmed)) {
+      return true;
+    }
+
+    // localhost
+    if (trimmed.startsWith("localhost")) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // 规范化 URL（自动添加协议）
+  const normalizeUrl = (url: string): string => {
+    const trimmed = url.trim();
+
+    // 已经有协议，直接返回
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+
+    // 默认添加 http://
+    return `http://${trimmed}`;
   };
 
   // 打开 URL
@@ -273,6 +319,10 @@ function App() {
     const newX = e.clientX - dragStartPosRef.current.x;
     const newY = e.clientY - dragStartPosRef.current.y;
 
+    // 获取被拖拽的卡片
+    const draggedCardData = cards.find(c => c.id === draggedCard);
+    if (!draggedCardData) return;
+
     // 检查是否在桶上
     const bucketElement = document.querySelector('.bucket-icon');
     let isOverBucket = false;
@@ -286,13 +336,31 @@ function App() {
         e.clientY <= bucketRect.bottom;
     }
 
+    // 判断是否改变桶状态
+    let newInBucketStatus = draggedCardData.inBucket;
+    let statusChanged = false;
+
+    if (draggedCardData.inBucket) {
+      // 如果原本在桶内，只有拖到桶外才移出
+      if (!isOverBucket) {
+        newInBucketStatus = false;
+        statusChanged = true;
+      }
+    } else {
+      // 如果原本在桶外，拖到桶上才移入
+      if (isOverBucket) {
+        newInBucketStatus = true;
+        statusChanged = true;
+      }
+    }
+
     // 更新状态
     const updatedCards = cards.map((card) => {
       if (card.id === draggedCard) {
         return {
           ...card,
           position: { x: newX, y: newY },
-          inBucket: isOverBucket,
+          inBucket: newInBucketStatus,
         };
       }
       return card;
@@ -301,8 +369,13 @@ function App() {
     setCards(updatedCards);
     saveLayout(updatedCards);
 
-    if (isOverBucket) {
-      showToast("图标已添加到桶中", "success");
+    // 显示提示
+    if (statusChanged) {
+      if (newInBucketStatus) {
+        showToast("图标已添加到桶中", "success");
+      } else {
+        showToast("图标已从桶中取出", "success");
+      }
     }
 
     // 重置拖拽状态
@@ -340,12 +413,16 @@ function App() {
       return;
     }
 
+    // 判断类型并规范化 URL
+    const isUrlType = isUrl(newAppForm.target);
+    const finalAction = isUrlType ? normalizeUrl(newAppForm.target) : newAppForm.target;
+
     const newApp: AppCard = {
       id: crypto.randomUUID(),
       name: newAppForm.name,
       icon: newAppForm.icon,
-      type: newAppForm.target.startsWith("http") ? "url" : "local",
-      action: newAppForm.target,
+      type: isUrlType ? "url" : "local",
+      action: finalAction,
       position: { x: window.innerWidth / 2 - 50, y: window.innerHeight / 2 - 50 },
       inBucket: false
     };
@@ -423,14 +500,18 @@ function App() {
       return;
     }
 
+    // 判断类型并规范化 URL
+    const isUrlType = isUrl(editForm.target);
+    const finalAction = isUrlType ? normalizeUrl(editForm.target) : editForm.target;
+
     const updatedCards = cards.map(card => {
       if (card.id === editingCard.id) {
         return {
           ...card,
           name: editForm.name,
-          action: editForm.target,
+          action: finalAction,
           icon: editForm.icon,
-          type: editForm.target.startsWith("http") ? "url" as const : "local" as const
+          type: isUrlType ? "url" as const : "local" as const
         };
       }
       return card;
@@ -468,8 +549,29 @@ function App() {
   const handleViewDetails = () => {
     const card = cards.find(c => c.id === contextMenu.cardId);
     if (card) {
-      const details = `名称: ${card.name}\n类型: ${card.type === "url" ? "网页链接" : "本地应用"}\n目标: ${card.action}`;
-      alert(details);
+      setDetailsCard(card);
+      setShowDetailsDialog(true);
+    }
+    closeContextMenu();
+  };
+
+  // 从桶中取出
+  const handleRemoveFromBucket = () => {
+    const card = cards.find(c => c.id === contextMenu.cardId);
+    if (card && card.inBucket) {
+      const updatedCards = cards.map(c => {
+        if (c.id === contextMenu.cardId) {
+          return {
+            ...c,
+            inBucket: false,
+            position: { x: window.innerWidth / 2 - 50, y: window.innerHeight / 2 - 50 }
+          };
+        }
+        return c;
+      });
+      setCards(updatedCards);
+      saveLayout(updatedCards);
+      showToast("已从桶中取出", "success");
     }
     closeContextMenu();
   };
@@ -596,7 +698,10 @@ function App() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleCardClick(e, card);
+                      // 只有在没有移动的情况下才执行点击
+                      if (!hasMovedRef.current) {
+                        handleCardClick(e, card);
+                      }
                     }}
                   >
                     <span className="bucket-item-icon">
@@ -878,6 +983,11 @@ function App() {
           <div className="context-menu-item" onClick={handleDelete}>
             <span>🗑️</span> 删除
           </div>
+          {cards.find(c => c.id === contextMenu.cardId)?.inBucket && (
+            <div className="context-menu-item" onClick={handleRemoveFromBucket}>
+              <span>📤</span> 从桶中取出
+            </div>
+          )}
           <div className="context-menu-item" onClick={handleViewDetails}>
             <span>👁️</span> 查看详情
           </div>
