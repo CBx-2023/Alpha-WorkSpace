@@ -1097,6 +1097,17 @@ function App() {
         </div>
       )}
 
+      {/* 底部版权信息 */}
+      <footer className="app-footer">
+        <div className="copyright">
+          <span>STARLANDAI</span>
+          <span className="copyright-sep">&&</span>
+          <span>天矶计划</span>
+          <span className="copyright-sep">|</span>
+          <span>© 2026 版权所有</span>
+        </div>
+      </footer>
+
       {/* Toast 通知 */}
       <div className="toast-container">
         {toasts.map((toast) => (

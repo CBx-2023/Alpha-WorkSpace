@@ -841,3 +841,31 @@
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
+/* 底部版本信息样式 */
+.app-footer {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    pointer-events: none;
+    /* 防止干扰背景点击 */
+    z-index: 1;
+}
+
+.copyright {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'Inter', system-ui, sans-serif;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.copyright-sep {
+    opacity: 0.5;
+}
